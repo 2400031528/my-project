@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🍛🥗 Food Waste Management System 🥪🍱</title>
+  <style>
+    body{
+      font-family:Arial,Helvetica,sans-serif;
+      background:linear-gradient(135deg,#e8f5e9,#ffffff);
+      margin:0;padding:0;text-align:center;
+    }
+    header{
+      background:rgba(0,153,51,0.9);
+      color:#fff;
+      padding:15px;
+      font-size:24px;
+      font-weight:700;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      gap:10px;
+      box-shadow:0 4px 10px rgba(0,0,0,0.3);
+      backdrop-filter:blur(5px);
+      position:relative;
+    }
+    .container{padding:20px}
+    .card{
+      background:#fff;
+      border-radius:15px;
+      box-shadow:0 4px 15px rgba(0,0,0,.1);
+      margin:20px auto;
+      max-width:720px;
+      padding:25px;
+      text-align:left;
+      transition:transform 0.3s;
+    }
+    .card:hover{transform:translateY(-5px)}
+    .btn{background:#009933;color:#fff;padding:10px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:700;transition:background 0.3s,transform 0.2s}
+    .btn:hover{background:#00b33c;transform:scale(1.03)}
+    .btn.danger{background:#d9534f}
+    .btn.danger:hover{background:#c9302c}
+    .logout{position:absolute;right:20px;color:#fff;font-size:14px;cursor:pointer}
+    .donation-item{background:#eaffea;border:1px solid #b2dfb2;border-radius:10px;padding:12px;margin-bottom:10px;transition:transform 0.2s}
+    .donation-item:hover{transform:scale(1.02)}
+    input,select{padding:10px;border-radius:8px;border:1px solid #ccc;width:calc(100% - 22px);box-sizing:border-box;margin-bottom:10px}
+    .muted{color:#555;font-size:13px}
+    .demo-box{background:#e6ffe6;border:1px solid #99cc99;border-radius:8px;padding:10px;margin-top:10px;font-size:14px}
+    h2{color:#009933;text-align:center;margin-top:0}
+    .small{font-size:13px;color:#444}
+  </style>
+</head>
+<body>
+  <header>
+    🍛🥗 Food Waste Management System 🥪🍱
+    <span id="logout" class="logout" onclick="logout()">Logout</span>
+  </header>
+  <div class="container" id="content"></div>
+
+  <script>
+    // --- State ---
+    let users = JSON.parse(localStorage.getItem('users')) || [
+      { email: 'admin@foodwaste.com', password: 'admin123', role: 'Admin' },
+      { email: 'donor@foodwaste.com', password: 'donor123', role: 'Donor' },
+      { email: 'user@foodwaste.com', password: 'user123', role: 'User' }
+    ];
+
+    let loggedUser = JSON.parse(localStorage.getItem('loggedUser')) || null;
+    let donations = JSON.parse(localStorage.getItem('donations')) || [];
+
+    function saveUsers(){ localStorage.setItem('users', JSON.stringify(users)); }
+    function saveDonations(){ localStorage.setItem('donations', JSON.stringify(donations)); }
+
+    // --- Init ---
+    if(!loggedUser){ showLoginForm(); } else { renderDashboard(loggedUser); }
+
+    // --- UI rendering ---
+    function showLoginForm(){
+      document.getElementById('content').innerHTML = `
+        <div class="card">
+          <h2>Login 🍽️</h2>
+          <input id="email" placeholder="Enter email" autocomplete="username" /><br>
+          <input id="password" type="password" placeholder="Enter password" autocomplete="current-password" /><br>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn" onclick="login()">Login</button>
+            <div class="small">New member? <a href="#" onclick="showRegisterForm()">Register here</a></div>
+          </div>
+          <div class="demo-box">
+            <b>Demo Accounts:</b><br>
+            🍱 Admin → admin@foodwaste.com / admin123<br>
+            🥗 Donor → donor@foodwaste.com / donor123<br>
+            🍔 User → user@foodwaste.com / user123
+          </div>
+        </div>` + footer();
+    }
+
+    function showRegisterForm(){
+      document.getElementById('content').innerHTML = `
+        <div class="card">
+          <h2>Register 🍲</h2>
+          <input id="regName" placeholder="Full name (optional)" /><br>
+          <input id="regEmail" placeholder="Enter email" autocomplete="email" /><br>
+          <input id="regPassword" type="password" placeholder="Enter password" autocomplete="new-password" /><br>
+          <select id="regRole">
+            <option value="Donor">Donor</option>
+            <option value="User">User</option>
+            <option value="Admin">Admin</option>
+          </select><br>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn" onclick="registerUser()">Register</button>
+            <div class="small">Already have an account? <a href="#" onclick="showLoginForm()">Login</a></div>
+          </div>
+        </div>` + footer();
+    }
+
+    function renderDashboard(user){
+      const content = document.getElementById('content');
+      let html = '';
+      if(user.role === 'Admin'){
+        const list = donations.map(d => donationCardAdmin(d)).join('') || '<p>No donations yet.</p>';
+        html = `<div class="card"><h2>🍱 Admin Dashboard</h2><p class="small">👋 Welcome, <b>${escapeHtml(user.name || user.email)}</b> — Admin</p>${list}</div>`;
+      } else if(user.role === 'Donor'){
+        const myDonations = donations.filter(d => d.donor === user.email);
+        const list = myDonations.map(d => donationCardDonor(d)).join('') || '<p>No donations yet.</p>';
+        html = `<div class="card"><h2>🥗 Donor Dashboard</h2><p class="small">👋 Welcome, <b>${escapeHtml(user.name || user.email)}</b> — Donor</p><button class="btn" onclick="toggleDonateForm()">Donate Food 🍛</button><div id="donateForm" style="display:none;margin-top:16px"><input id="foodName" placeholder="Food name" /><br><input id="quantity" placeholder="Quantity (kg)" /><br><input id="location" placeholder="Pickup location" /><br><button class="btn" onclick="submitDonation()">Submit Donation</button></div><h3 style="margin-top:18px">Your Donations</h3>${list}</div>`;
+      } else {
+        const available = donations.filter(d => d.status === 'Pending');
+        const list = available.map(d => donationCardUser(d)).join('') || '<p>No donations available.</p>';
+        html = `<div class="card"><h2>🍔 User Dashboard</h2><p class="small">👋 Welcome, <b>${escapeHtml(user.name || user.email)}</b> — User</p>${list}</div>`;
+      }
+      content.innerHTML = html + footer();
+    }
+
+    function footer(){
+      return `<div style="margin-top:20px;font-size:13px;color:#333">📞 Contact us: support@foodwaste.com | 🌍 Save Food, Serve Humanity</div>`;
+    }
+
+    // --- Templates ---
+    function donationCardAdmin(d){
+      return `<div class="donation-item" data-id="${d.id}"><div><b>${escapeHtml(d.food)}</b> - ${escapeHtml(d.qty)}kg (${escapeHtml(d.status)})</div><div class="small">Donor: ${escapeHtml(d.donor)}${d.claimedBy? ' • Claimed by: ' + escapeHtml(d.claimedBy): ''}</div><div style="margin-top:8px"><button class="btn" onclick="approveDonationById('${d.id}')">Approve</button><button class="btn danger" onclick="deleteDonationById('${d.id}')" style="margin-left:8px">Delete</button><button class="btn" onclick="editDonationById('${d.id}')" style="margin-left:8px">Edit</button></div></div>`;
+    }
+
+    function donationCardDonor(d){
+      return `<div class="donation-item"><div><b>${escapeHtml(d.food)}</b> - ${escapeHtml(d.qty)}kg (${escapeHtml(d.status)})</div><div class="small">Pickup: ${escapeHtml(d.loc)}${d.claimedBy? ' • Claimed by: ' + escapeHtml(d.claimedBy): ''}</div></div>`;
+    }
+
+    function donationCardUser(d){
+      return `<div class="donation-item"><div><b>${escapeHtml(d.food)}</b> - ${escapeHtml(d.qty)}kg</div><div class="small">Donor: ${escapeHtml(d.donor)}</div><div style="margin-top:8px"><button class="btn" onclick="claimDonationById('${d.id}')">Claim</button></div></div>`;
+    }
+
+    // --- Helpers ---
+    function escapeHtml(str){ return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    // --- Actions ---
+    function toggleDonateForm(){ const f = document.getElementById('donateForm'); if(!f) return; f.style.display = f.style.display==='none'?'block':'none'; }
+
+    function registerUser(){
+      const name = (document.getElementById('regName')?.value || '').trim();
+      const email = (document.getElementById('regEmail')?.value || '').trim();
+      const password = (document.getElementById('regPassword')?.value || '').trim();
+      const role = (document.getElementById('regRole')?.value || 'User');
+      if(!email||!password){alert('Please fill all fields');return;}
+      if(users.find(u=>u.email===email)){alert('User already exists');return;}
+      users.push({name,email,password,role}); saveUsers(); alert('Registered!'); showLoginForm();
+    }
+
+    function login(){
+      const email = (document.getElementById('email')?.value || '').trim();
+      const password = (document.getElementById('password')?.value || '').trim();
+      const user = users.find(u=>u.email===email && u.password===password);
+      if(!user){alert('Invalid credentials');return;}    
+      loggedUser=user; localStorage.setItem('loggedUser',JSON.stringify(user)); renderDashboard(user);
+    }
+
+    function logout(){ localStorage.removeItem('loggedUser'); loggedUser=null; showLoginForm(); }
+
+    function submitDonation(){
+      // ensure donor is logged
+      if(!loggedUser || loggedUser.role !== 'Donor'){ alert('Only donors can submit donations'); return; }
+      // read inputs
+      const food = (document.getElementById('foodName')?.value || '').trim();
+      const qty = (document.getElementById('quantity')?.value || '').trim();
+      const loc = (document.getElementById('location')?.value || '').trim();
+      if(!food || !qty || !loc){ alert('Please fill all donation fields'); return; }
+      const donation = { id: Date.now().toString(36), food, qty, loc, donor: loggedUser.email, status: 'Pending', claimedBy: null };
+      donations.push(donation); saveDonations();
+      // clear inputs if they exist
+      if(document.getElementById('foodName')) document.getElementById('foodName').value = '';
+      if(document.getElementById('quantity')) document.getElementById('quantity').value = '';
+      if(document.getElementById('location')) document.getElementById('location').value = '';
+      alert('Donation submitted successfully!');
+      renderDashboard(loggedUser);
+    }
+
+    function claimDonationById(id){
+      if(!loggedUser || loggedUser.role !== 'User'){ alert('Only users can claim donations'); return; }
+      const idx = donations.findIndex(d=>d.id===id); if(idx===-1){ alert('Donation not found'); return; }
+      if(donations[idx].status !== 'Pending'){ alert('Donation not available'); return; }
+      donations[idx].status = 'Claimed'; donations[idx].claimedBy = loggedUser.email; saveDonations(); alert('Claim registered — awaiting admin approval'); renderDashboard(loggedUser);
+    }
+
+    function approveDonationById(id){
+      if(!loggedUser || loggedUser.role !== 'Admin'){ alert('Only admin can approve'); return; }
+      const idx = donations.findIndex(d=>d.id===id); if(idx===-1){ alert('Donation not found'); return; }
+      if(donations[idx].status !== 'Claimed'){ alert('Only claimed donations can be approved'); return; }
+      donations[idx].status = 'Approved'; saveDonations(); alert('Donation approved'); renderDashboard(loggedUser);
+    }
+
+    function deleteDonationById(id){
+      if(!loggedUser || loggedUser.role !== 'Admin'){ alert('Only admin can delete'); return; }
+      const idx = donations.findIndex(d=>d.id===id); if(idx===-1){ alert('Donation not found'); return; }
+      if(!confirm('Delete this donation permanently?')) return; donations.splice(idx,1); saveDonations(); alert('Donation deleted'); renderDashboard(loggedUser);
+    }
+
+    function editDonationById(id){
+      if(!loggedUser || loggedUser.role !== 'Admin'){ alert('Only admin can edit'); return; }
+      const idx = donations.findIndex(d=>d.id===id); if(idx===-1){ alert('Donation not found'); return; }
+      const d = donations[idx];
+      const newFood = prompt('Food name:', d.food) || d.food;
+      const newQty = prompt('Quantity (kg):', d.qty) || d.qty;
+      const newLoc = prompt('Pickup location:', d.loc) || d.loc;
+      donations[idx].food = newFood.trim(); donations[idx].qty = newQty.trim(); donations[idx].loc = newLoc.trim(); saveDonations(); alert('Donation updated'); renderDashboard(loggedUser);
+    }
+
+    // expose functions used by inline onclick handlers
+    window.login = login;
+    window.logout = logout;
+    window.toggleDonateForm = toggleDonateForm;
+    window.registerUser = registerUser;
+    window.submitDonation = submitDonation;
+    window.claimDonationById = claimDonationById;
+    window.approveDonationById = approveDonationById;
+    window.deleteDonationById = deleteDonationById;
+    window.editDonationById = editDonationById;
+
+  </script>
+</body>
+</html>
